@@ -11,6 +11,7 @@ from .ogham import OghamMemoryProvider
 from .supermemory import SupermemoryMemoryProvider
 from .none import NoMemoryProvider
 from .hscoding import HsCodingProvider
+from puffo_agent.evaluation.amb_provider import PuffoBM25MemoryProvider, PuffoMemoryProvider
 
 REGISTRY: dict[str, type[MemoryProvider]] = {
     "vanilla": NoMemoryProvider,
@@ -28,6 +29,8 @@ REGISTRY: dict[str, type[MemoryProvider]] = {
     "ogham": OghamMemoryProvider,
     "qdrant": HybridSearchMemoryProvider,
     "supermemory": SupermemoryMemoryProvider,
+    "puffo": PuffoMemoryProvider,
+    "puffo-bm25": PuffoBM25MemoryProvider,
 }
 # legacy aliases (docs/scripts used these); canonical names above
 REGISTRY["none"] = NoMemoryProvider
