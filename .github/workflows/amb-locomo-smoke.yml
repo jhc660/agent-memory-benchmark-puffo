@@ -39,20 +39,43 @@ jobs:
           uv sync --frozen
           uv pip install -e "$GITHUB_WORKSPACE/puffo-agent"
 
-      - name: Run one-query LoCoMo comparison
+      - name: Diagnose one-query LoCoMo baseline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI }}
-          QUERY_LIMIT: "1"
         run: |
+          set -o pipefail
+          mkdir -p diagnostic diagnostic-output
           test -n "$GEMINI_API_KEY"
-          uv run amb run --dataset locomo --split locomo10 --memory bm25 --query-limit "$QUERY_LIMIT" --name locomo-bm25-q"$QUERY_LIMIT"
-          uv run amb run --dataset locomo --split locomo10 --memory puffo --query-limit "$QUERY_LIMIT" --name locomo-puffo-q"$QUERY_LIMIT"
-          uv run amb run --dataset locomo --split locomo10 --memory puffo-bm25 --query-limit "$QUERY_LIMIT" --name locomo-puffo-bm25-q"$QUERY_LIMIT"
+          python - <<'PY'
+          from memory_bench.memory import REGISTRY
 
-      - name: Upload AMB results
+          for provider in ("bm25", "puffo", "puffo-bm25"):
+              assert provider in REGISTRY, f"Missing provider: {provider}"
+          print("Required AMB providers are registered.")
+          PY
+          set +e
+          uv run amb run --dataset locomo --split locomo10 --memory bm25 --query-limit 1 --name locomo-bm25-q1 --output-dir diagnostic-output > diagnostic/bm25.raw.log 2>&1
+          status=$?
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          raw_log = Path("diagnostic/bm25.raw.log")
+          sanitized_log = Path("diagnostic/bm25-sanitized.log")
+          text = raw_log.read_text(encoding="utf-8", errors="replace")[-12000:]
+          text = re.sub(r"AIza[0-9A-Za-z_-]{20,}", "[REDACTED_GOOGLE_API_KEY]", text)
+          text = re.sub(r"(?i)(api[_-]?key\s*[=:]\s*)\S+", r"\1[REDACTED]", text)
+          sanitized_log.write_text(text, encoding="utf-8")
+          PY
+          rm diagnostic/bm25.raw.log
+          exit "$status"
+
+      - name: Upload baseline diagnostic
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: amb-locomo-smoke-results
-          path: outputs/
+          name: amb-locomo-baseline-diagnostic
+          path: |
+            diagnostic/
+            diagnostic-output/
           if-no-files-found: warn
