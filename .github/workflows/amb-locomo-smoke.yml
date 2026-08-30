@@ -46,7 +46,7 @@ jobs:
           set -o pipefail
           mkdir -p diagnostic diagnostic-output
           test -n "$GEMINI_API_KEY"
-          python - <<'PY'
+          uv run python - <<'PY'
           from memory_bench.memory import REGISTRY
 
           for provider in ("bm25", "puffo", "puffo-bm25"):
