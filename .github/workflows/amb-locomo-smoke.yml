@@ -1,0 +1,58 @@
+name: AMB LoCoMo smoke evaluation
+
+on:
+  push:
+    branches:
+      - feat/puffo-provider
+    paths:
+      - .github/workflows/amb-locomo-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  locomo-smoke:
+    runs-on: ubuntu-24.04
+    environment: amb-eval
+    timeout-minutes: 360
+    steps:
+      - name: Check out AMB provider branch
+        uses: actions/checkout@v6
+
+      - name: Check out Puffo evaluation branch
+        uses: actions/checkout@v6
+        with:
+          repository: puffo-ai/puffo-agent
+          ref: feat/amb-locomo-eval
+          path: puffo-agent
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install AMB and Puffo
+        run: |
+          uv sync --frozen
+          uv pip install -e "$GITHUB_WORKSPACE/puffo-agent"
+
+      - name: Run one-query LoCoMo comparison
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI }}
+          QUERY_LIMIT: "1"
+        run: |
+          test -n "$GEMINI_API_KEY"
+          uv run amb run --dataset locomo --split locomo10 --memory bm25 --query-limit "$QUERY_LIMIT" --name locomo-bm25-q"$QUERY_LIMIT"
+          uv run amb run --dataset locomo --split locomo10 --memory puffo --query-limit "$QUERY_LIMIT" --name locomo-puffo-q"$QUERY_LIMIT"
+          uv run amb run --dataset locomo --split locomo10 --memory puffo-bm25 --query-limit "$QUERY_LIMIT" --name locomo-puffo-bm25-q"$QUERY_LIMIT"
+
+      - name: Upload AMB results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amb-locomo-smoke-results
+          path: outputs/
+          if-no-files-found: warn
