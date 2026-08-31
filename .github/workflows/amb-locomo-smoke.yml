@@ -1,6 +1,7 @@
 name: AMB LoCoMo smoke evaluation
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/puffo-provider
