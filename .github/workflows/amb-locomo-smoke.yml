@@ -59,20 +59,23 @@ jobs:
           PY
           set +e
           uv run amb run --dataset locomo --split locomo10 --memory bm25 --query-limit 1 --name locomo-bm25-q1 --output-dir diagnostic-output > diagnostic/bm25.raw.log 2>&1
-          status=$?
+          bm25_status=$?
+          uv run amb run --dataset locomo --split locomo10 --memory puffo --query-limit 1 --name locomo-puffo-q1 --output-dir diagnostic-output > diagnostic/puffo.raw.log 2>&1
+          puffo_status=$?
           python - <<'PY'
           from pathlib import Path
           import re
 
-          raw_log = Path("diagnostic/bm25.raw.log")
-          sanitized_log = Path("diagnostic/bm25-sanitized.log")
-          text = raw_log.read_text(encoding="utf-8", errors="replace")[-12000:]
-          text = re.sub(r"AIza[0-9A-Za-z_-]{20,}", "[REDACTED_GOOGLE_API_KEY]", text)
-          text = re.sub(r"(?i)(api[_-]?key\s*[=:]\s*)\S+", r"\1[REDACTED]", text)
-          sanitized_log.write_text(text, encoding="utf-8")
+          for name in ("bm25", "puffo"):
+              raw_log = Path(f"diagnostic/{name}.raw.log")
+              sanitized_log = Path(f"diagnostic/{name}-sanitized.log")
+              text = raw_log.read_text(encoding="utf-8", errors="replace")[-12000:]
+              text = re.sub(r"AIza[0-9A-Za-z_-]{20,}", "[REDACTED_GOOGLE_API_KEY]", text)
+              text = re.sub(r"(?i)(api[_-]?key\s*[=:]\s*)\S+", r"\1[REDACTED]", text)
+              sanitized_log.write_text(text, encoding="utf-8")
           PY
-          rm diagnostic/bm25.raw.log
-          exit "$status"
+          rm diagnostic/bm25.raw.log diagnostic/puffo.raw.log
+          test "$bm25_status" -eq 0 -a "$puffo_status" -eq 0
 
       - name: Upload baseline diagnostic
         if: always()
