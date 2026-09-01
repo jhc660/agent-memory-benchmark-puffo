@@ -40,7 +40,7 @@ jobs:
           uv sync --frozen
           uv pip install -e "$GITHUB_WORKSPACE/puffo-agent"
 
-      - name: Diagnose one-query LoCoMo baseline
+      - name: Measure one-query LoCoMo retrieval
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI }}
           OMB_ANSWER_LLM: gemini
@@ -60,13 +60,13 @@ jobs:
           set +e
           uv run amb run --dataset locomo --split locomo10 --memory bm25 --query-limit 1 --name locomo-bm25-q1 --output-dir diagnostic-output > diagnostic/bm25.raw.log 2>&1
           bm25_status=$?
-          uv run amb run --dataset locomo --split locomo10 --memory puffo --query-limit 1 --name locomo-puffo-q1 --output-dir diagnostic-output > diagnostic/puffo.raw.log 2>&1
-          puffo_status=$?
+          uv run amb run --dataset locomo --split locomo10 --memory puffo-bm25 --query-limit 1 --name locomo-puffo-bm25-q1 --output-dir diagnostic-output > diagnostic/puffo-bm25.raw.log 2>&1
+          puffo_bm25_status=$?
           python - <<'PY'
           from pathlib import Path
           import re
 
-          for name in ("bm25", "puffo"):
+          for name in ("bm25", "puffo-bm25"):
               raw_log = Path(f"diagnostic/{name}.raw.log")
               sanitized_log = Path(f"diagnostic/{name}-sanitized.log")
               text = raw_log.read_text(encoding="utf-8", errors="replace")[-12000:]
@@ -74,8 +74,8 @@ jobs:
               text = re.sub(r"(?i)(api[_-]?key\s*[=:]\s*)\S+", r"\1[REDACTED]", text)
               sanitized_log.write_text(text, encoding="utf-8")
           PY
-          rm diagnostic/bm25.raw.log diagnostic/puffo.raw.log
-          test "$bm25_status" -eq 0 -a "$puffo_status" -eq 0
+          rm diagnostic/bm25.raw.log diagnostic/puffo-bm25.raw.log
+          test "$bm25_status" -eq 0 -a "$puffo_bm25_status" -eq 0
 
       - name: Upload baseline diagnostic
         if: always()
